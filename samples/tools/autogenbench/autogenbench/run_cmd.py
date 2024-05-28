@@ -474,6 +474,10 @@ echo RUN.SH COMPLETE !#!#
     if autogen_repo_base is not None:
         volumes[str(pathlib.Path(autogen_repo_base).absolute())] = {"bind": "/autogen", "mode": "rw"}
 
+        #HACKYHACKYHACKHACKHACK
+        autogencapdir = os.path.join(autogen_repo_base, "samples", "apps", "cap", "py")
+        volumes[str(pathlib.Path(autogencapdir).absolute())] = {"bind": "/autogencap", "mode": "rw"}
+
     print("Mounting:")
     for k in volumes:
         bind = volumes[k]["bind"]

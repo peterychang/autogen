@@ -12,7 +12,9 @@ RUN pip install --upgrade pip
 
 # Pre-load autogen dependencies, but not autogen itself since we'll often want to install the latest from source
 RUN pip install pyautogen[teachable,lmm,graphs,websurfer]
+RUN pip install autogencap-rajan.jedi
 RUN pip uninstall --yes pyautogen
+RUN pip uninstall --yes autogencap-rajan.jedi
 
 # Pre-load popular packages as per https://learnpython.com/blog/most-popular-python-packages/
 RUN pip install numpy pandas matplotlib seaborn scikit-learn requests urllib3 nltk pillow pytest

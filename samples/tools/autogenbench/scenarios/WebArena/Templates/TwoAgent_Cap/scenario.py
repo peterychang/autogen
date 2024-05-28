@@ -8,15 +8,11 @@ from autogen.agentchat.contrib.multimodal_web_surfer import MultimodalWebSurferA
 from autogen.agentchat.contrib.mmagent import MultimodalAgent
 from autogen.runtime_logging import logging_enabled, log_event
 
-# Hacky get autogencap in for testing
-import sys
-import subprocess
-# implement pip as a subprocess:
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'autogencap-rajan.jedi'])
-
 from autogencap.ag_adapter.CAPPair import CAPPair
 from autogencap.ComponentEnsemble import ComponentEnsemble
 from autogencap.DebugLog import Info
+
+import time
 
 
 from evaluation_harness.env_config import (
@@ -109,6 +105,14 @@ for site in TASK["sites"]:
                 message=LOGIN_PROMPTS[site],
                 #clear_history=True,
             )
+                # Wait for the pair to finish
+            try:
+                while pair.running():
+                    # Hang out for a while and print out
+                    # status every now and then
+                    time.sleep(0.5)
+            except KeyboardInterrupt:
+                print("Interrupted by user, shutting down.")
         except Exception as e:
             import traceback
 

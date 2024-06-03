@@ -39,6 +39,7 @@ class CAPWrapper:
         self._first_ag_agent = first
         self._second_ag_agent = second
 
+        # TODO: Make the start_thread params configurable
         self._first_adptr = CAP2AG(
             ag_agent=self._first_ag_agent,
             the_other_name=self._second_ag_agent.name,
@@ -75,6 +76,7 @@ class CAPWrapper:
         agent_connection = self._network.find_by_name(agent.name)
         agent_connection.send_txt_msg(message)
 
+        # TODO: Make this aware of threaded agents
         while self.running():
             message1 = agent_adptr.get_message()
             agent_adptr.dispatch_message(message1)
@@ -82,6 +84,9 @@ class CAPWrapper:
             message2 = other_adptr.get_message()
             other_adptr.dispatch_message(message2)
 
+        # TODO: It would be better to not fully disconnect here. Just wait for 
+        #       additional messages OR a disconnect so that we don't have to keep
+        #       creating wrappers for this workflow
         self._network.disconnect()
 
     # Do a single back-and-forth conversation

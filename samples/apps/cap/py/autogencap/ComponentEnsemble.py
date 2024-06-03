@@ -51,8 +51,10 @@ class ComponentEnsemble:
             actor.disconnect_network(self)
         if self._directory_svc:
             self._directory_svc.stop()
+        self._directory_svc = None
         if self._broker:
             self._broker.stop()
+        self._broker = None
 
     def find_by_topic(self, topic: str) -> ActorConnector:
         return ActorConnector(self._context, topic)

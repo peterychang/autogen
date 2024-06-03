@@ -12,6 +12,7 @@ class Actor:
         self.run = False
         self._start_event = threading.Event()
         self._start_thread = start_thread
+        self.SOCKET_TIMEOUT = 500
 
     def on_connect(self, network):
         Debug(self.actor_name, f"is connecting to {network}")
@@ -28,7 +29,7 @@ class Actor:
     def _msg_loop_init(self):
         Debug(self.actor_name, "recv thread started")
         self._socket: zmq.Socket = self._context.socket(zmq.SUB)
-        self._socket.setsockopt(zmq.RCVTIMEO, 500)
+        self._socket.setsockopt(zmq.RCVTIMEO, self.SOCKET_TIMEOUT)
         self._socket.connect(xpub_url)
         str_topic = f"{self.actor_name}"
         Debug(self.actor_name, f"subscribe to: {str_topic}")
@@ -100,3 +101,6 @@ class Actor:
             self._thread.join()
         self._socket.setsockopt(zmq.LINGER, 0)
         self._socket.close()
+
+    def is_threaded(self):
+        return self._start_thread

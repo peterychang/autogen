@@ -18,8 +18,8 @@ class CAP2AG(AGActor):
 
     States = Enum("States", ["INIT", "CONVERSING"])
 
-    def __init__(self, ag_agent: ConversableAgent, the_other_name: str, init_chat: bool, self_recursive: bool = True):
-        super().__init__(ag_agent.name, ag_agent.description)
+    def __init__(self, ag_agent: ConversableAgent, the_other_name: str, init_chat: bool, self_recursive: bool = True, start_thread: bool = True):
+        super().__init__(ag_agent.name, ag_agent.description, start_thread=start_thread)
         self._the_ag_agent: ConversableAgent = ag_agent
         self._ag2can_other_agent: AG2CAP = None
         self._other_agent_name: str = the_other_name

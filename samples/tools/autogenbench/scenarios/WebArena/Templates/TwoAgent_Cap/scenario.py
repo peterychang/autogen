@@ -10,10 +10,12 @@ from autogen.runtime_logging import logging_enabled, log_event
 
 from autogencap.ag_adapter.CAPPair import CAPPair
 from autogencap.ComponentEnsemble import ComponentEnsemble
-from autogencap.DebugLog import Info
+from autogencap.ag_adapter.CAP2AG import CAP2AG
+from autogencap.DebugLog import INFO
+import autogencap.Config as Config
 
 import time
-
+Config.LOG_LEVEL = INFO
 
 from evaluation_harness.env_config import (
     ACCOUNTS,
@@ -31,6 +33,88 @@ from evaluation_harness.env_config import (
 
 testbed_utils.init()
 ##############################
+class CAPWrapper:
+    def __init__(self, network, first, second):
+        self._network = network
+        self._first_ag_agent = first
+        self._second_ag_agent = second
+
+        self._first_adptr = CAP2AG(
+            ag_agent=self._first_ag_agent,
+            the_other_name=self._second_ag_agent.name,
+            init_chat=True,
+            self_recursive=True,
+            start_thread = False,
+        )
+        self._second_adptr = CAP2AG(
+            ag_agent=self._second_ag_agent,
+            the_other_name=self._first_ag_agent.name,
+            init_chat=False,
+            self_recursive=True,
+            start_thread = False,
+        )
+
+    def initiate_chat_sync(self, agent, message: str):
+        if not self.running():
+            self._network.register(self._first_adptr)
+            self._network.register(self._second_adptr)
+            self._network.connect()
+        
+        # a little hacky hacky to get this to work
+        agent_adptr = None
+        other_adptr = None
+        if agent == self._first_ag_agent:
+            agent_adptr = self._first_adptr
+            other_adptr = self._second_adptr
+        else:
+            agent_adptr = self._second_adptr
+            other_adptr = self._first_adptr
+
+
+        # Send a message to the user_proxy
+        agent_connection = self._network.find_by_name(agent.name)
+        agent_connection.send_txt_msg(message)
+
+        while self.running():
+            message1 = agent_adptr.get_message()
+            agent_adptr.dispatch_message(message1)
+
+            message2 = other_adptr.get_message()
+            other_adptr.dispatch_message(message2)
+
+        self._network.disconnect()
+
+    # Do a single back-and-forth conversation
+    def send_sync(self, agent, message: str):
+        if not self.running():
+            self._network.register(self._first_adptr)
+            self._network.register(self._second_adptr)
+            self._network.connect()
+        
+        # a little hacky hacky to get this to work
+        agent_adptr = None
+        other_adptr = None
+        if agent == self._first_ag_agent:
+            agent_adptr = self._first_adptr
+            other_adptr = self._second_adptr
+        else:
+            agent_adptr = self._second_adptr
+            other_adptr = self._first_adptr
+
+        # Send a message to the user_proxy
+        agent_connection = self._network.find_by_name(agent.name)
+        agent_connection.send_txt_msg(message)
+
+        message1 = agent_adptr.get_message()
+        agent_adptr.dispatch_message(message1)
+
+        message2 = other_adptr.get_message()
+        other_adptr.dispatch_message(message2)
+
+        self._network.disconnect()
+
+    def running(self):
+        return self._first_adptr.run and self._second_adptr.run
 
 REPLACEMENTS = {
     "__REDDIT__": REDDIT,
@@ -91,28 +175,48 @@ Once the user has taken the final necessary action to complete the task, and you
     max_consecutive_auto_reply=20,
 )
 
+#cap_web_surfer = CAP2AG(
+#    ag_agent=web_surfer,
+#    the_other_name=user_proxy.name,
+#    init_chat=True,
+#    self_recursive=True,
+#    start_thread = False,
+#)
+#cap_user_proxy = CAP2AG(
+#    ag_agent=user_proxy,
+#    the_other_name=web_surfer.name,
+#    init_chat=True,
+#    self_recursive=True,
+#    start_thread = True,
+#)
+
 ensemble = ComponentEnsemble()
-pair = CAPPair(ensemble, user_proxy, web_surfer)
+#pair = CAPPair(ensemble, user_proxy, web_surfer)
+#ensemble.register(cap_web_surfer)
+#ensemble.register(cap_user_proxy)
+#ensemble.connect()
+#web_surfer_link = ensemble.find_by_name(web_surfer.name)
+#user_proxy_link = ensemble.find_by_name(user_proxy.name)
 
-
+#cap = CAPWrapper(ensemble, user_proxy, web_surfer)
 # Login to the necessary websites
 for site in TASK["sites"]:
     if site in ["reddit", "gitlab", "shopping", "shopping_admin"]:
         if logging_enabled():
             log_event(os.path.basename(__file__), name="start_" + site + "_task")
         try:
-            pair.initiate_chat(
-                message=LOGIN_PROMPTS[site],
-                #clear_history=True,
-            )
-                # Wait for the pair to finish
-            try:
-                while pair.running():
-                    # Hang out for a while and print out
-                    # status every now and then
-                    time.sleep(0.5)
-            except KeyboardInterrupt:
-                print("Interrupted by user, shutting down.")
+#            user_proxy_link.send_txt_msg(LOGIN_PROMPTS[site])
+#
+#            while cap_web_surfer.run and cap_user_proxy.run:
+#                #message1 = cap_user_proxy.get_message()
+#                #cap_user_proxy.dispatch_message(message1)
+#
+#                message2 = cap_web_surfer.get_message()
+#                cap_web_surfer.dispatch_message(message2)
+            cap = CAPWrapper(ensemble, user_proxy, web_surfer)
+            cap.initiate_chat_sync(user_proxy, LOGIN_PROMPTS[site])
+            time.sleep(0.5)
+                    
         except Exception as e:
             import traceback
 
@@ -131,6 +235,59 @@ for site in TASK["sites"]:
             raise e
         user_proxy.reset()
         web_surfer.reset()
+
+Config.LOG_LEVEL = 0
+# Navigate to the starting url
+if logging_enabled():
+    log_event(os.path.basename(__file__), name="navigate_start_url")
+start_url = TASK["start_url"]
+if start_url == REDDIT:
+    start_url = start_url + "/forums"
+
+cap = CAPWrapper(ensemble, user_proxy, web_surfer)
+cap.send_sync(user_proxy, f"Type '{start_url}' into the address bar.")
+user_proxy.reset()
+web_surfer.reset()
+
+Config.LOG_LEVEL = 1
+
+print("MAIN TASK STARTING !#!#")
+
+# Provide some background about the pages
+site_description_prompt = ""
+sitename = url_to_sitename(start_url)
+if sitename:
+    site_description_prompt = ", " + SITE_DESCRIPTIONS[sitename]
+
+if logging_enabled():
+    log_event(os.path.basename(__file__), name="main_task_initiate_chat")
+
+try:
+    cap = CAPWrapper(ensemble, user_proxy, web_surfer)
+    cap.initiate_chat_sync(
+        web_surfer,
+        message=f"""
+We are visiting the website {start_url}{site_description_prompt}. On this website, please complete the following task:
+
+{TASK['intent']}
+""".strip(),
+    )
+except Exception as e:
+    import traceback
+
+    if logging_enabled():
+        exc_type = type(e).__name__
+        exc_message = str(e)
+        exc_traceback = traceback.format_exc().splitlines()
+        log_event(
+            os.path.basename(__file__),
+            name="exception_thrown",
+            exc_type=exc_type,
+            exc_message=exc_message,
+            exc_traceback=exc_traceback,
+        )
+
+    raise e
 
 
 ##################

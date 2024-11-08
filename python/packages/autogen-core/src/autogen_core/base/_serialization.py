@@ -146,6 +146,8 @@ class PydanticJsonMessageSerializer(MessageSerializer[PydanticT]):
 
 
 MessageT = TypeVar("MessageT", bound=Message)
+
+
 class ProtobufMessageSerializer(MessageSerializer[MessageT]):
     def __init__(self, cls: type[MessageT]) -> None:
         self.cls = cls
@@ -163,6 +165,7 @@ class ProtobufMessageSerializer(MessageSerializer[MessageT]):
 
     def serialize(self, message: MessageT) -> bytes:
         return message.SerializeToString()
+
 
 @dataclass
 class UnknownPayload:

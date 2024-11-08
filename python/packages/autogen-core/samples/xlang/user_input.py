@@ -1,14 +1,14 @@
 import asyncio
-from typing import Union
 import logging
+from typing import Union
 
-from autogen_core.components import DefaultTopicId, RoutedAgent, default_subscription, message_handler
-from autogen_core.base import MessageContext
-from autogen_core.components.models._types import SystemMessage
 from autogen_core.application.protos.agent_events_pb2 import ConversationClosed, Input, NewMessageReceived, Output
-
+from autogen_core.base import MessageContext
+from autogen_core.components import DefaultTopicId, RoutedAgent, default_subscription, message_handler
+from autogen_core.components.models._types import SystemMessage
 
 input_types = Union[ConversationClosed, Input, Output]
+
 
 @default_subscription
 class UserProxy(RoutedAgent):
@@ -27,17 +27,15 @@ class UserProxy(RoutedAgent):
         agnext_logger = logging.getLogger("autogen_core")
 
         if isinstance(message, Input):
-          response = await self.ainput("User input ('exit' to quit): ")
-          response = response.strip()
-          agnext_logger.info(response)
-          
-          await self.publish_message(
-              NewMessageReceived(message=response), topic_id=DefaultTopicId()
-          )
+            response = await self.ainput("User input ('exit' to quit): ")
+            response = response.strip()
+            agnext_logger.info(response)
+
+            await self.publish_message(NewMessageReceived(message=response), topic_id=DefaultTopicId())
         elif isinstance(message, Output):
-          agnext_logger.info(message.message)
+            agnext_logger.info(message.message)
         else:
-          pass
+            pass
 
     async def ainput(self, prompt: str) -> str:
         return await asyncio.to_thread(input, f"{prompt} ")

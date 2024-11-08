@@ -10,7 +10,6 @@ from autogen_core.application.protos.agent_events_pb2 import Input
 # sys.path.append(os.path.abspath('../../../../python/packages/autogen-core'))
 from autogen_core.components import DefaultTopicId
 from dotenv import load_dotenv
-from messages import ArticleCreated, AuditorAlert, AuditText, GraphicDesignCreated
 from user_input import UserProxy
 
 agnext_logger = logging.getLogger("autogen_core")

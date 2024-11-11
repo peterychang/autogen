@@ -135,6 +135,9 @@ internal sealed class WorkerGateway : BackgroundService, IWorkerGateway
             case Message.MessageOneofCase.RegisterAgentTypeRequest:
                 await RegisterAgentTypeAsync(connection, message.RegisterAgentTypeRequest);
                 break;
+            case Message.MessageOneofCase.AddSubscriptionRequest:
+                await AddSubscriptionAsync(connection, message.AddSubscriptionRequest);
+                break;
             default:
                 throw new InvalidOperationException($"Unknown message type for message '{message}'.");
         };
@@ -160,6 +163,16 @@ internal sealed class WorkerGateway : BackgroundService, IWorkerGateway
         var request_id = msg.RequestId;
         var response = new RegisterAgentTypeResponse { RequestId = request_id, Success = success, Error = error };
         await connection.SendMessage(new Message { RegisterAgentTypeResponse = response });
+    }
+
+    private async ValueTask AddSubscriptionAsync(WorkerProcessConnection connection, AddSubscriptionRequest msg)
+    {
+        var success = false;
+        var error = String.Empty;
+
+        var request_id = msg.RequestId;
+        var response = new AddSubscriptionResponse { RequestId = request_id, Success = success, Error = error };
+        await connection.SendMessage(new Message { AddSubscriptionResponse = response });
     }
 
     private async ValueTask DispatchEventAsync(CloudEvent evt)

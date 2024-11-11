@@ -198,6 +198,7 @@ def try_get_known_serializers_for_type(cls: type[Any]) -> list[MessageSerializer
     elif isinstance(cls, IsDataclass):
         serializers.append(DataclassJsonMessageSerializer(cls))
     elif issubclass(cls, Message):
+        print("PROTOBUF! " + cls.__name__)
         serializers.append(ProtobufMessageSerializer(cls))
 
     return serializers

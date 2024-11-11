@@ -9,8 +9,6 @@ from autogen_core.components.models._types import SystemMessage
 
 input_types = Union[ConversationClosed, Input, Output]
 
-
-@default_subscription
 class UserProxy(RoutedAgent):
     """An agent that allows the user to play the role of an agent in the conversation via input."""
 

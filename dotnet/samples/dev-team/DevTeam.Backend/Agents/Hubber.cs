@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Hubber.cs
+
 using System.Text.Json;
 using DevTeam;
 using DevTeam.Backend;
@@ -10,7 +13,7 @@ using Microsoft.SemanticKernel.Memory;
 namespace Microsoft.AI.DevTeam;
 
 public class Hubber(IAgentContext context, Kernel kernel, ISemanticTextMemory memory, [FromKeyedServices("EventTypes")] EventTypes typeRegistry, IManageGithub ghService)
-    : AiAgent<object>(context, memory, kernel, typeRegistry),
+    : SKAiAgent<object>(context, memory, kernel, typeRegistry),
     IHandle<NewAsk>,
     IHandle<ReadmeGenerated>,
     IHandle<DevPlanGenerated>,

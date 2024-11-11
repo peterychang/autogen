@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Agents/Microsoft.AutoGen.Agents.csproj" />
+    <ProjectReference Include="..\AIModelClientHostingExtensions\AIModelClientHostingExtensions.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -13,7 +14,7 @@
   <ItemGroup>
 	<PackageReference Include="Azure.AI.OpenAI" />
 	<PackageReference Include="Microsoft.SemanticKernel" />
-	  
+
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" />
   </ItemGroup>

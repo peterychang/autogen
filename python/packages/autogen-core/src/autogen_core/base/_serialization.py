@@ -91,7 +91,8 @@ def has_nested_base_model_in_type(tp: Any) -> bool:
 DataclassT = TypeVar("DataclassT", bound=IsDataclass)
 
 JSON_DATA_CONTENT_TYPE = "application/json"
-PROTOBUF_DATA_CONTENT_TYPE = "application/octet-stream"
+# TODO: what's the correct content type? There seems to be some disagreement over what it should be
+PROTOBUF_DATA_CONTENT_TYPE = "application/x-protobuf"
 
 
 class DataclassJsonMessageSerializer(MessageSerializer[DataclassT]):
@@ -145,24 +146,33 @@ class PydanticJsonMessageSerializer(MessageSerializer[PydanticT]):
         return message.model_dump_json().encode("utf-8")
 
 
-MessageT = TypeVar("MessageT", bound=Message)
-class ProtobufMessageSerializer(MessageSerializer[MessageT]):
-    def __init__(self, cls: type[MessageT]) -> None:
+ProtobufT = TypeVar("ProtobufT", bound=Message)
+
+
+class ProtobufMessageSerializer(MessageSerializer[ProtobufT]):
+    def __init__(self, cls: type[ProtobufT]) -> None:
         self.cls = cls
 
     @property
     def data_content_type(self) -> str:
-        return PROTOBUF_DATA_CONTENT_TYPE
+        # TODO: This should be PROTOBUF_DATA_CONTENT_TYPE. There are currently
+        #       a couple of hard coded places where the system assumes the
+        #       content is JSON_DATA_CONTENT_TYPE which will need to be fixed
+        #       first.
+        return JSON_DATA_CONTENT_TYPE
 
     @property
     def type_name(self) -> str:
         return _type_name(self.cls)
 
-    def deserialize(self, payload: bytes) -> MessageT:
-        return self.cls.ParseFromString(payload)
+    def deserialize(self, payload: bytes) -> ProtobufT:
+        ret = self.cls()
+        ret.ParseFromString(payload)
+        return ret
 
-    def serialize(self, message: MessageT) -> bytes:
+    def serialize(self, message: ProtobufT) -> bytes:
         return message.SerializeToString()
+
 
 @dataclass
 class UnknownPayload:

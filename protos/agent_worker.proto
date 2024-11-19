@@ -47,16 +47,6 @@ message Event {
     map<string, string> metadata = 5;
 }
 
-message RegisterAgentTypeRequest {
-    string request_id = 1;
-    string type = 2;
-}
-
-message RegisterAgentTypeResponse {
-    string request_id = 1;
-    bool success = 2;
-    optional string error = 3;
-}
 
 message TypeSubscription {
     string topic_type = 1;
@@ -69,18 +59,9 @@ message Subscription {
     }
 }
 
-message AddSubscriptionRequest {
-    string request_id = 1;
-    Subscription subscription = 2;
-}
-
-message AddSubscriptionResponse {
-    string request_id = 1;
-    bool success = 2;
-    optional string error = 3;
-}
-
 service AgentRpc {
+    rpc RegisterAgent (RegisterAgentTypeRequest) returns (RegisterAgentTypeResponse);
+    rpc AddSubscription (AddSubscriptionRequest) returns (AddSubscriptionResponse);
     rpc OpenChannel (stream Message) returns (stream Message);
     rpc GetState(AgentId) returns (GetStateResponse);
     rpc SaveState(AgentState) returns (SaveStateResponse);
@@ -107,16 +88,35 @@ message SaveStateResponse {
     optional string error = 2;
 }
 
+// Autogen API Surface. Message should be wrapped in CloudEvent
+
+message RegisterAgentTypeRequest {
+    string request_id = 1;
+    string type = 2;
+}
+
+message RegisterAgentTypeResponse {
+    string request_id = 1;
+    bool success = 2;
+    optional string error = 3;
+}
+
+message AddSubscriptionRequest {
+    string request_id = 1;
+    Subscription subscription = 2;
+}
+
+message AddSubscriptionResponse {
+    string request_id = 1;
+    bool success = 2;
+    optional string error = 3;
+}
+
 message Message {
     oneof message {
         RpcRequest request = 1;
         RpcResponse response = 2;
         Event event = 3;
-        RegisterAgentTypeRequest registerAgentTypeRequest = 4;
-        RegisterAgentTypeResponse registerAgentTypeResponse = 5;
-        AddSubscriptionRequest addSubscriptionRequest = 6;
-        AddSubscriptionResponse addSubscriptionResponse = 7;
-        cloudevent.CloudEvent cloudEvent = 8;
     }
 }
 

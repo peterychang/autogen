@@ -19,6 +19,16 @@ class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type:
 
 class AgentRpcStub:
     def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
+    RegisterAgent: grpc.UnaryUnaryMultiCallable[
+        agent_worker_pb2.RegisterAgentTypeRequest,
+        agent_worker_pb2.RegisterAgentTypeResponse,
+    ]
+
+    AddSubscription: grpc.UnaryUnaryMultiCallable[
+        agent_worker_pb2.AddSubscriptionRequest,
+        agent_worker_pb2.AddSubscriptionResponse,
+    ]
+
     OpenChannel: grpc.StreamStreamMultiCallable[
         agent_worker_pb2.Message,
         agent_worker_pb2.Message,
@@ -35,6 +45,16 @@ class AgentRpcStub:
     ]
 
 class AgentRpcAsyncStub:
+    RegisterAgent: grpc.aio.UnaryUnaryMultiCallable[
+        agent_worker_pb2.RegisterAgentTypeRequest,
+        agent_worker_pb2.RegisterAgentTypeResponse,
+    ]
+
+    AddSubscription: grpc.aio.UnaryUnaryMultiCallable[
+        agent_worker_pb2.AddSubscriptionRequest,
+        agent_worker_pb2.AddSubscriptionResponse,
+    ]
+
     OpenChannel: grpc.aio.StreamStreamMultiCallable[
         agent_worker_pb2.Message,
         agent_worker_pb2.Message,
@@ -51,6 +71,20 @@ class AgentRpcAsyncStub:
     ]
 
 class AgentRpcServicer(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def RegisterAgent(
+        self,
+        request: agent_worker_pb2.RegisterAgentTypeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[agent_worker_pb2.RegisterAgentTypeResponse, collections.abc.Awaitable[agent_worker_pb2.RegisterAgentTypeResponse]]: ...
+
+    @abc.abstractmethod
+    def AddSubscription(
+        self,
+        request: agent_worker_pb2.AddSubscriptionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[agent_worker_pb2.AddSubscriptionResponse, collections.abc.Awaitable[agent_worker_pb2.AddSubscriptionResponse]]: ...
+
     @abc.abstractmethod
     def OpenChannel(
         self,

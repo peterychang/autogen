@@ -14,6 +14,16 @@ class AgentRpcStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.RegisterAgent = channel.unary_unary(
+                '/agents.AgentRpc/RegisterAgent',
+                request_serializer=agent__worker__pb2.RegisterAgentTypeRequest.SerializeToString,
+                response_deserializer=agent__worker__pb2.RegisterAgentTypeResponse.FromString,
+                )
+        self.AddSubscription = channel.unary_unary(
+                '/agents.AgentRpc/AddSubscription',
+                request_serializer=agent__worker__pb2.AddSubscriptionRequest.SerializeToString,
+                response_deserializer=agent__worker__pb2.AddSubscriptionResponse.FromString,
+                )
         self.OpenChannel = channel.stream_stream(
                 '/agents.AgentRpc/OpenChannel',
                 request_serializer=agent__worker__pb2.Message.SerializeToString,
@@ -33,6 +43,18 @@ class AgentRpcStub(object):
 
 class AgentRpcServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def RegisterAgent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddSubscription(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def OpenChannel(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
@@ -55,6 +77,16 @@ class AgentRpcServicer(object):
 
 def add_AgentRpcServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'RegisterAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterAgent,
+                    request_deserializer=agent__worker__pb2.RegisterAgentTypeRequest.FromString,
+                    response_serializer=agent__worker__pb2.RegisterAgentTypeResponse.SerializeToString,
+            ),
+            'AddSubscription': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddSubscription,
+                    request_deserializer=agent__worker__pb2.AddSubscriptionRequest.FromString,
+                    response_serializer=agent__worker__pb2.AddSubscriptionResponse.SerializeToString,
+            ),
             'OpenChannel': grpc.stream_stream_rpc_method_handler(
                     servicer.OpenChannel,
                     request_deserializer=agent__worker__pb2.Message.FromString,
@@ -79,6 +111,40 @@ def add_AgentRpcServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class AgentRpc(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def RegisterAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/agents.AgentRpc/RegisterAgent',
+            agent__worker__pb2.RegisterAgentTypeRequest.SerializeToString,
+            agent__worker__pb2.RegisterAgentTypeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def AddSubscription(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/agents.AgentRpc/AddSubscription',
+            agent__worker__pb2.AddSubscriptionRequest.SerializeToString,
+            agent__worker__pb2.AddSubscriptionResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def OpenChannel(request_iterator,

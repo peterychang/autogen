@@ -127,7 +127,7 @@ class HostConnection:
         )
         instance = cls(channel)
         instance._connection_task = asyncio.create_task(
-            instance._connect(channel, instance._send_queue, instance._recv_queue)
+            instance._connect(instance._send_queue, instance._recv_queue)
         )
         return instance
 
@@ -137,13 +137,12 @@ class HostConnection:
         await self._channel.close()
         await self._connection_task
 
-    @staticmethod
     async def _connect(  # type: ignore
-        channel: grpc.aio.Channel,
+        self,
         send_queue: asyncio.Queue[agent_worker_pb2.Message],
         receive_queue: asyncio.Queue[agent_worker_pb2.Message],
     ) -> None:
-        stub: AgentRpcAsyncStub = agent_worker_pb2_grpc.AgentRpcStub(channel)  # type: ignore
+        stub: AgentRpcAsyncStub = agent_worker_pb2_grpc.AgentRpcStub(self._channel)  # type: ignore
 
         # TODO: where do exceptions from reading the iterable go? How do we recover from those?
         recv_stream: StreamStreamCall[agent_worker_pb2.Message, agent_worker_pb2.Message] = stub.OpenChannel(  # type: ignore
@@ -160,6 +159,16 @@ class HostConnection:
             logger.info(f"Received a message from host: {message}")
             await receive_queue.put(message)
             logger.info("Put message in receive queue")
+
+    async def register_agent(self, message: agent_worker_pb2.RegisterAgentTypeRequest) -> agent_worker_pb2.RegisterAgentTypeResponse:
+        logger.info(f"Registering agent with host: {message}")
+        stub: AgentRpcAsyncStub = agent_worker_pb2_grpc.AgentRpcStub(self._channel)  # type: ignore
+        return await stub.RegisterAgent(message)
+
+    async def add_subscription(self, message: agent_worker_pb2.AddSubscriptionRequest) -> agent_worker_pb2.AddSubscriptionResponse:
+        logger.info(f"Adding subscription to host: {message}")
+        stub: AgentRpcAsyncStub = agent_worker_pb2_grpc.AgentRpcStub(self._channel)  # type: ignore
+        return await stub.AddSubscription(message)
 
     async def send(self, message: agent_worker_pb2.Message) -> None:
         logger.info(f"Send message to host: {message}")
@@ -241,19 +250,9 @@ class WorkerAgentRuntime(AgentRuntime):
                         task.add_done_callback(self._raise_on_exception)
                         task.add_done_callback(self._background_tasks.discard)
                     case "registerAgentTypeResponse":
-                        task = asyncio.create_task(
-                            self._process_register_agent_type_response(message.registerAgentTypeResponse)
-                        )
-                        self._background_tasks.add(task)
-                        task.add_done_callback(self._raise_on_exception)
-                        task.add_done_callback(self._background_tasks.discard)
+                        logger.warning(f"Cant handle {oneofcase}, skipping.")
                     case "addSubscriptionResponse":
-                        task = asyncio.create_task(
-                            self._process_add_subscription_response(message.addSubscriptionResponse)
-                        )
-                        self._background_tasks.add(task)
-                        task.add_done_callback(self._raise_on_exception)
-                        task.add_done_callback(self._background_tasks.discard)
+                        logger.warning(f"Cant handle {oneofcase}, skipping.")
                     case "cloudEvent":
                         task = asyncio.create_task(self._process_cloud_event(message.cloudEvent))
                         self._background_tasks.add(task)
@@ -269,6 +268,7 @@ class WorkerAgentRuntime(AgentRuntime):
     async def stop(self) -> None:
         """Stop the runtime immediately."""
         if not self._running:
+            # TODO: raise? log?
             raise RuntimeError("Runtime is not running.")
         self._running = False
         # Wait for all background tasks to finish.
@@ -386,20 +386,36 @@ class WorkerAgentRuntime(AgentRuntime):
             "create", topic_id, parent=None, extraAttributes={"message_type": message_type}
         ):
             telemetry_metadata = get_telemetry_grpc_metadata()
-            proto_data = any_pb2.Any()
-            proto_data.Pack(msg=message)
+
+            serialized_message = self._serialization_registry.serialize(
+                message, type_name=message_type, data_content_type=JSON_DATA_CONTENT_TYPE
+            )
+            wrapped_message = agent_worker_pb2.Message(
+                event=agent_worker_pb2.Event(
+                    topic_type=topic_id.type,
+                    topic_source=topic_id.source,
+                    source=agent_worker_pb2.AgentId(type=sender.type, key=sender.key) if sender is not None else None,
+                    metadata=telemetry_metadata,
+                    payload=agent_worker_pb2.Payload(
+                        data_type=message_type,
+                        data=serialized_message,
+                        data_content_type=JSON_DATA_CONTENT_TYPE,
+                    ),
+                )
+            )
+
             if sender is not None:
                 source = str(AgentId(type=sender.type, key=sender.key))
             else:
                 source = ""
-            runtime_message = agent_worker_pb2.Message(
-                cloudEvent=cloudevent_pb2.CloudEvent(
-                    spec_version="1.0",
-                    type=topic_id.type,
-                    source=source,
-                    metadata=telemetry_metadata,
-                    proto_data=proto_data,
-                )
+            proto_data = any_pb2.Any()
+            proto_data.Pack(msg=wrapped_message)
+            runtime_message=cloudevent_pb2.CloudEvent(
+                spec_version="1.0",
+                type=topic_id.type,
+                source=source,
+                metadata=telemetry_metadata,
+                proto_data=proto_data,
             )
             task = asyncio.create_task(self._send_message(runtime_message, "publish", topic_id, telemetry_metadata))
             self._background_tasks.add(task)
@@ -580,16 +596,13 @@ class WorkerAgentRuntime(AgentRuntime):
         # Create a future for the registration response.
         future = asyncio.get_event_loop().create_future()
         request_id = await self._get_new_request_id()
-        self._pending_requests[request_id] = future
 
         # Send the registration request message to the host.
-        message = agent_worker_pb2.Message(
-            registerAgentTypeRequest=agent_worker_pb2.RegisterAgentTypeRequest(request_id=request_id, type=type)
+        message = agent_worker_pb2.RegisterAgentTypeRequest(
+            request_id=request_id, type=type.type
         )
-        await self._host_connection.send(message)
-
-        # Wait for the registration response.
-        await future
+        resp = await self._host_connection.register_agent(message)
+        self._process_register_agent_type_response(resp)
 
         if subscriptions is not None:
             if callable(subscriptions):
@@ -603,7 +616,8 @@ class WorkerAgentRuntime(AgentRuntime):
                 subscriptions_list = subscriptions
 
             for subscription in subscriptions_list:
-                await self.add_subscription(subscription)
+                resp = await self.add_subscription(subscription)
+                self._process_add_subscription_response(resp)
 
         return AgentType(type)
 
@@ -633,28 +647,20 @@ class WorkerAgentRuntime(AgentRuntime):
 
         self._agent_factories[type.type] = factory_wrapper
 
-        # Create a future for the registration response.
-        future = asyncio.get_event_loop().create_future()
         request_id = await self._get_new_request_id()
-        self._pending_requests[request_id] = future
 
         # Send the registration request message to the host.
-        message = agent_worker_pb2.Message(
-            registerAgentTypeRequest=agent_worker_pb2.RegisterAgentTypeRequest(request_id=request_id, type=type.type)
+        message = agent_worker_pb2.RegisterAgentTypeRequest(
+            request_id=request_id, type=type.type
         )
-        await self._host_connection.send(message)
-
-        # Wait for the registration response.
-        await future
+        resp = await self._host_connection.register_agent(message)
+        self._process_register_agent_type_response(resp)
 
         return type
 
-    async def _process_register_agent_type_response(self, response: agent_worker_pb2.RegisterAgentTypeResponse) -> None:
-        future = self._pending_requests.pop(response.request_id)
+    def _process_register_agent_type_response(self, response: agent_worker_pb2.RegisterAgentTypeResponse) -> None:
         if response.HasField("error") and response.error:
-            future.set_exception(RuntimeError(response.error))
-        else:
-            future.set_result(None)
+            raise RuntimeError(response.error)
 
     async def _invoke_agent_factory(
         self,
@@ -714,32 +720,25 @@ class WorkerAgentRuntime(AgentRuntime):
         await self._subscription_manager.add_subscription(subscription)
 
         # Create a future for the subscription response.
-        future = asyncio.get_event_loop().create_future()
         request_id = await self._get_new_request_id()
-        self._pending_requests[request_id] = future
 
         # Send the subscription to the host.
-        message = agent_worker_pb2.Message(
-            addSubscriptionRequest=agent_worker_pb2.AddSubscriptionRequest(
-                request_id=request_id,
-                subscription=agent_worker_pb2.Subscription(
-                    typeSubscription=agent_worker_pb2.TypeSubscription(
-                        topic_type=subscription.topic_type, agent_type=subscription.agent_type
-                    )
-                ),
-            )
+        message = agent_worker_pb2.AddSubscriptionRequest(
+            request_id=request_id,
+            subscription=agent_worker_pb2.Subscription(
+                typeSubscription=agent_worker_pb2.TypeSubscription(
+                    topic_type=subscription.topic_type, agent_type=subscription.agent_type
+                )
+            ),
         )
-        await self._host_connection.send(message)
 
-        # Wait for the subscription response.
-        await future
+        resp = await self._host_connection.add_subscription(message)
+        self._process_add_subscription_response(resp)
 
-    async def _process_add_subscription_response(self, response: agent_worker_pb2.AddSubscriptionResponse) -> None:
-        future = self._pending_requests.pop(response.request_id)
+    def _process_add_subscription_response(self, response: agent_worker_pb2.AddSubscriptionResponse) -> None:
         if response.HasField("error") and response.error:
-            future.set_exception(RuntimeError(response.error))
-        else:
-            future.set_result(None)
+            # TODO: raise? log?
+            raise RuntimeError(response.error)
 
     async def remove_subscription(self, id: str) -> None:
         raise NotImplementedError("Subscriptions cannot be removed while using distributed runtime currently.")

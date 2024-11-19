@@ -29,6 +29,26 @@ class WorkerAgentRuntimeHostServicer(agent_worker_pb2_grpc.AgentRpcServicer):
         self._subscription_manager = SubscriptionManager()
         self._client_id_to_subscription_id_mapping: Dict[int, set[str]] = {}
 
+    async def RegisterAgent(
+        self,
+        request: agent_worker_pb2.RegisterAgentTypeRequest,
+        context: grpc.aio.ServicerContext[agent_worker_pb2.RegisterAgentTypeRequest, agent_worker_pb2.RegisterAgentTypeResponse]
+    ) -> agent_worker_pb2.RegisterAgentTypeResponse:
+        async with self._client_id_lock:
+            self._client_id += 1
+            client_id = self._client_id
+        return await self._process_register_agent_type_request(request, client_id)
+
+    async def AddSubscription(
+        self,
+        request: agent_worker_pb2.AddSubscriptionRequest,
+        context: grpc.aio.ServicerContext[agent_worker_pb2.AddSubscriptionRequest, agent_worker_pb2.AddSubscriptionResponse]
+    ) -> agent_worker_pb2.AddSubscriptionResponse:
+        async with self._client_id_lock:
+            self._client_id += 1
+            client_id = self._client_id
+        return await self._process_add_subscription_request(request, client_id)
+
     async def OpenChannel(  # type: ignore
         self,
         request_iterator: AsyncIterator[agent_worker_pb2.Message],
@@ -114,19 +134,9 @@ class WorkerAgentRuntimeHostServicer(agent_worker_pb2_grpc.AgentRpcServicer):
                     task.add_done_callback(self._raise_on_exception)
                     task.add_done_callback(self._background_tasks.discard)
                 case "registerAgentTypeRequest":
-                    register_agent_type: agent_worker_pb2.RegisterAgentTypeRequest = message.registerAgentTypeRequest
-                    task = asyncio.create_task(
-                        self._process_register_agent_type_request(register_agent_type, client_id)
-                    )
-                    self._background_tasks.add(task)
-                    task.add_done_callback(self._raise_on_exception)
-                    task.add_done_callback(self._background_tasks.discard)
+                    logger.warning(f"Received unexpected message type: {oneofcase}")
                 case "addSubscriptionRequest":
-                    add_subscription: agent_worker_pb2.AddSubscriptionRequest = message.addSubscriptionRequest
-                    task = asyncio.create_task(self._process_add_subscription_request(add_subscription, client_id))
-                    self._background_tasks.add(task)
-                    task.add_done_callback(self._raise_on_exception)
-                    task.add_done_callback(self._background_tasks.discard)
+                    logger.warning(f"Received unexpected message type: {oneofcase}")
                 case "registerAgentTypeResponse" | "addSubscriptionResponse":
                     logger.warning(f"Received unexpected message type: {oneofcase}")
                 case None:
@@ -189,7 +199,7 @@ class WorkerAgentRuntimeHostServicer(agent_worker_pb2_grpc.AgentRpcServicer):
 
     async def _process_register_agent_type_request(
         self, register_agent_type_req: agent_worker_pb2.RegisterAgentTypeRequest, client_id: int
-    ) -> None:
+    ) -> agent_worker_pb2.RegisterAgentTypeResponse:
         # Register the agent type with the host runtime.
         async with self._agent_type_to_client_id_lock:
             if register_agent_type_req.type in self._agent_type_to_client_id:
@@ -204,17 +214,13 @@ class WorkerAgentRuntimeHostServicer(agent_worker_pb2_grpc.AgentRpcServicer):
                 success = True
                 error = None
         # Send a response back to the client.
-        await self._send_queues[client_id].put(
-            agent_worker_pb2.Message(
-                registerAgentTypeResponse=agent_worker_pb2.RegisterAgentTypeResponse(
-                    request_id=register_agent_type_req.request_id, success=success, error=error
-                )
-            )
+        return agent_worker_pb2.RegisterAgentTypeResponse(
+            request_id=register_agent_type_req.request_id, success=success, error=error
         )
 
     async def _process_add_subscription_request(
         self, add_subscription_req: agent_worker_pb2.AddSubscriptionRequest, client_id: int
-    ) -> None:
+    ) -> agent_worker_pb2.AddSubscriptionResponse:
         oneofcase = add_subscription_req.subscription.WhichOneof("subscription")
         match oneofcase:
             case "typeSubscription":
@@ -234,12 +240,8 @@ class WorkerAgentRuntimeHostServicer(agent_worker_pb2_grpc.AgentRpcServicer):
                     success = False
                     error = str(e)
                 # Send a response back to the client.
-                await self._send_queues[client_id].put(
-                    agent_worker_pb2.Message(
-                        addSubscriptionResponse=agent_worker_pb2.AddSubscriptionResponse(
-                            request_id=add_subscription_req.request_id, success=success, error=error
-                        )
-                    )
+                return agent_worker_pb2.AddSubscriptionResponse(
+                    request_id=add_subscription_req.request_id, success=success, error=error
                 )
             case None:
                 logger.warning("Received empty subscription message")

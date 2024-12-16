@@ -20,6 +20,7 @@ group chat for task decomposition, and reflection for robustness.
 ```{toctree}
 :maxdepth: 1
 
+code-execution-groupchat
 concurrent-agents
 sequential-workflow
 group-chat
